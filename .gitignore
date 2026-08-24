@@ -1,0 +1,27 @@
+# MATLAB
+*.asv
+*.m~
+*.mlx.autosave
+
+# MATLAB generated/build files
+codegen/
+slprj/
+*_ert_rtw/
+*_grt_rtw/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.log
+
+# Large/generated experiment outputs
+*.mat
