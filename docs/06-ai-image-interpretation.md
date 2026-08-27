@@ -1,325 +1,198 @@
-# AI Image Interpretation
+# 06 — AI-Based Image Interpretation
 
 ## 1. Purpose
 
-The AI stage is where the pipeline moves from image processing to image interpretation.
+The AI stage is the part of the project where the processed ultrasound image is used to produce information beyond the image itself.
 
-The input to this stage will be the enhanced ultrasound image produced by the previous stage. The AI model will then perform one defined task and return a result that can be displayed as part of the final application.
+The input to this stage will come from the image-enhancement stage. The AI model will then perform a defined task on the processed ultrasound image and produce an output that can be displayed as part of the final Holoscan application.
 
-The purpose of this work is not to build a clinical diagnostic system. It is to demonstrate that an AI model can be integrated into the same processing pipeline as ultrasound reconstruction and image enhancement, while still meeting the practical requirements of a real-time application.
+The first version of the project will use **ultrasound image classification** as the AI task. This keeps the first implementation manageable while still demonstrating the complete path from raw ultrasound data to AI-assisted output.
 
-The AI task will therefore be kept manageable and measurable.
+The initial network will be **MobileNetV2**, used as a transfer-learning baseline.
 
-The final choice of task and model will be based on the available data, the quality of the reconstructed images, model performance, and inference speed.
+The choice is based mainly on the requirements of the overall project. The model needs to be reasonably lightweight, straightforward to train in MATLAB, and suitable for later GPU-based inference. A larger network can be investigated later if the baseline does not provide sufficient performance.
 
----
+The AI stage is therefore initially defined as:
 
-## 2. AI Task
-
-The first decision is to define exactly what the model needs to do.
-
-Possible tasks include:
-
-* Image classification
-* Object or region detection
-* Image segmentation
-
-These tasks have different data and implementation requirements.
-
-### Classification
-
-The model receives an ultrasound image and predicts a class.
-
-For example:
-
-```text
-Ultrasound Image
-        ↓
-AI Model
-        ↓
-Class + Confidence
-```
-
-This is the simplest option and is a good starting point if the available dataset contains reliable image-level labels.
-
-### Detection
-
-The model identifies a region or structure inside the image.
-
-```text
-Ultrasound Image
-        ↓
-AI Model
-        ↓
-Bounding Box + Class + Confidence
-```
-
-This provides a more visible demonstration because the detected region can be drawn directly over the ultrasound image.
-
-### Segmentation
-
-The model produces a pixel-level mask.
-
-```text
-Ultrasound Image
-        ↓
-AI Model
-        ↓
-Segmentation Mask
-```
-
-Segmentation is more demanding because the training dataset needs pixel-level annotations.
-
-The final task will be selected after the available datasets and reconstructed image format have been evaluated.
-
-For the initial implementation, a lightweight classification or detection task is preferred because it keeps the development effort under control and allows more time for GPU and Holoscan integration.
+**Enhanced Ultrasound Image → Preprocessing → MobileNetV2 → Class Prediction + Confidence**
 
 ---
 
-## 3. Dataset
+## 2. Initial AI Task
 
-The AI model needs a dataset that matches the selected task.
+The first AI task will be image classification.
 
-A publicly available ultrasound dataset may be used if it provides suitable images and labels.
+The model will receive an ultrasound image and assign it to one of the classes defined by the selected dataset.
 
-One possible starting point is the Breast Ultrasound Images Dataset (BUSI), which contains ultrasound images with associated labels and segmentation information.
+Classification is being chosen as the starting point because it allows the AI pipeline to be developed without immediately introducing the additional complexity of object-detection bounding boxes or pixel-level segmentation masks.
 
-Other datasets may be considered if they provide a better match to the final imaging task.
+Once the classification pipeline is working, more advanced tasks can be considered if they provide a useful improvement to the overall project.
 
-The dataset will not automatically be treated as suitable just because it is publicly available.
+Possible future extensions include:
 
-Before using it, the following will be checked:
+* Region-of-interest detection
+* Lesion detection
+* Anatomical structure segmentation
+* Multi-class classification
+* Frame-level temporal analysis
 
-* Image format
+These are not required for the first working version.
+
+The initial objective is to get one complete AI inference path working reliably inside the larger imaging pipeline.
+
+---
+
+## 3. Baseline Network
+
+The first network to be evaluated will be **MobileNetV2**.
+
+MobileNetV2 is a convolutional neural network designed with relatively low computational requirements compared with many larger image-classification networks.
+
+This makes it a reasonable starting point for this project because the final application is intended to operate as a real-time pipeline rather than as an offline classification experiment.
+
+The model will initially be used through transfer learning.
+
+Instead of training the complete network from random initialization, the existing feature-extraction layers will be reused and the final classification portion will be adapted to the selected ultrasound dataset.
+
+The initial approach will therefore be:
+
+**Pretrained MobileNetV2 → Replace Classification Layer → Train on Ultrasound Dataset → Validate → Test**
+
+The actual model configuration will be documented after implementation rather than being assumed in advance.
+
+---
+
+## 4. Why MobileNetV2
+
+The network was selected as a baseline for practical reasons.
+
+The project has a limited GPU memory budget and ultimately needs to run as part of a streaming application. Using a relatively compact network gives us a better starting point for measuring the complete pipeline.
+
+MobileNetV2 also provides a useful reference point for later comparisons.
+
+If the baseline performs adequately, it may remain the final model.
+
+If its classification performance is not sufficient, another network can be evaluated and compared against it.
+
+Possible alternatives can include other lightweight convolutional networks supported by the available MATLAB toolchain.
+
+The project will therefore avoid choosing a large model simply because it produces better offline results.
+
+The final network should provide a reasonable balance between:
+
+* Classification performance
+* Model size
+* GPU memory usage
+* Inference time
+* Deployment complexity
+* Overall pipeline latency
+
+---
+
+## 5. Dataset
+
+The AI dataset will be selected based on the final classification task.
+
+A possible starting point is the **Breast Ultrasound Images Dataset (BUSI)** or another suitable publicly available ultrasound dataset.
+
+The dataset must provide enough labelled images to support training and evaluation.
+
+Before training begins, the dataset will be inspected to determine:
+
+* Number of classes
+* Number of images per class
 * Image dimensions
-* Number of samples
-* Class distribution
+* Image format
 * Label quality
-* Availability of annotations
-* Licensing and permitted use
-* Similarity to the intended ultrasound application
-* Suitability for the selected AI task
+* Class imbalance
+* Duplicate or near-duplicate images
+* Availability of appropriate train/test separation
 
 The final dataset choice will be recorded in the project documentation once it has been confirmed.
 
----
+The dataset used for AI training does not necessarily have to be the same dataset used for raw RF reconstruction.
 
-## 4. Relationship Between the Dataset and Raw RF Pipeline
+This distinction is important.
 
-There is an important distinction between the imaging dataset and the raw RF dataset.
+The reconstruction part of the project requires raw signal or channel data, while the AI classification task requires labelled ultrasound images.
 
-The raw RF data is required to demonstrate the image-reconstruction part of the project.
+If the available raw dataset does not contain suitable labels for the chosen AI task, a separate labelled ultrasound image dataset can be used for AI development.
 
-The AI dataset does not necessarily need to contain RF data if the selected AI task is designed around ultrasound images.
-
-This creates two possible development paths.
-
-### Path A — Separate Development Datasets
-
-```text
-Raw RF Dataset
-      ↓
-Reconstruction
-      ↓
-Enhancement
-      ↓
-Test / Visualization
-
-Ultrasound Image Dataset
-      ↓
-Training
-      ↓
-AI Model
-```
-
-The AI model can then be tested with images having the same general characteristics as the output of the imaging pipeline.
-
-### Path B — Common Imaging Data
-
-If the selected raw dataset also contains suitable labels or annotations, it may be possible to use the same data for both reconstruction and AI development.
-
-This would provide a stronger end-to-end relationship because the AI model would be trained and evaluated on images produced from the same type of acquisition data.
-
-The final choice will depend on what data is actually available.
-
-The project should not claim that an AI model trained on an unrelated image dataset has been clinically or scientifically validated for the reconstructed RF dataset.
+The relationship between the two datasets will be documented clearly.
 
 ---
 
-## 5. Dataset Preparation
+## 6. Dataset Preparation
 
-Before training, the dataset will be inspected and prepared.
+The dataset will be divided into training, validation, and test sets.
 
-Typical preparation steps include:
+The test data must remain separate from the training process so that the final model can be evaluated on images that were not used during training.
 
-```text
-Original Dataset
-      ↓
-Remove / identify unusable samples
-      ↓
-Verify Labels
-      ↓
-Resize / Format Images
-      ↓
-Normalize Input
-      ↓
-Training / Validation / Test Split
-```
+Care will also be taken to avoid data leakage.
 
-The exact preprocessing will depend on the selected model.
+For example, if multiple images originate from the same patient or examination, those images should not be randomly distributed across training and testing in a way that allows information from the same subject to appear in both sets.
 
-The preprocessing applied during training must also be available during inference.
+The exact split will depend on the structure of the selected dataset.
 
-For example, if training images are resized and normalized in a particular way, the same operations must be applied to the images arriving from the enhancement stage.
+The preprocessing pipeline will also be kept consistent between training and inference.
 
-Otherwise, the model will be receiving data that differs from what it saw during training.
+Typical preprocessing may include:
+
+* Image resizing
+* Conversion to the required number of channels
+* Intensity normalization
+* Dataset-specific preprocessing
+* Data augmentation during training
+
+The final preprocessing operations will be documented after the dataset has been inspected.
 
 ---
 
-## 6. Training, Validation, and Test Sets
+## 7. Transfer Learning
 
-The dataset will be divided into separate subsets.
+MobileNetV2 will initially be used through transfer learning.
 
-The training set will be used to fit the model.
+The pretrained network provides a set of feature-extraction layers that can be adapted to the ultrasound classification problem.
 
-The validation set will be used during development to monitor model behavior and compare configurations.
+The final classification layers will be replaced or modified so that the network produces the number of classes required by the selected dataset.
 
-The test set will be kept separate and used for the final evaluation.
+Training will then be performed using the training portion of the dataset.
 
-The exact split ratio will depend on the size of the selected dataset.
+Validation data will be used during training to monitor model behavior and help identify problems such as overfitting.
 
-A typical starting point could be:
-
-```text
-Dataset
-├── Training
-├── Validation
-└── Testing
-```
-
-Care must also be taken to avoid leakage between the sets.
-
-If multiple images belong to the same patient or examination, samples from the same patient should not be split across training and testing where the dataset structure allows patient-level separation.
-
-The test set should represent data that the model has not seen during training.
+The model that performs best according to the selected validation criteria will then be evaluated using the independent test set.
 
 ---
 
-## 7. Data Augmentation
+## 8. Training
 
-Data augmentation may be used if the selected dataset is relatively small.
+The first training implementation will be developed in MATLAB using the available Deep Learning Toolbox functionality.
 
-Possible augmentation operations include:
+The initial training process will establish a working baseline rather than attempting to optimize every possible training parameter immediately.
 
-* Small rotations
-* Translation
-* Scaling
-* Cropping
-* Intensity changes
-* Other transformations that remain realistic for ultrasound images
+Parameters that may be investigated include:
 
-Augmentation should not be applied blindly.
+* Learning rate
+* Batch size
+* Number of epochs
+* Optimizer
+* Data augmentation
+* Layer freezing
+* Input image size
 
-A transformation that changes the medical meaning of an image would not be appropriate simply because it increases the number of training examples.
+The exact values will be determined experimentally.
 
-The augmentation strategy will therefore be kept conservative and based on the selected task.
+Training results will be recorded so that different experiments can be compared rather than relying only on the final model.
 
----
-
-## 8. Model Selection
-
-The initial model should be small enough to run efficiently on the target GPU while still providing useful performance.
-
-A lightweight convolutional neural network is therefore a practical starting point.
-
-Transfer learning can also be considered.
-
-The general approach is:
-
-```text
-Pretrained Network
-        ↓
-Replace / Adapt Final Layers
-        ↓
-Train Using Ultrasound Dataset
-        ↓
-Evaluate
-```
-
-Using a pretrained network can reduce the amount of training data and training time required compared with building a network completely from scratch.
-
-Possible model choices will be evaluated based on:
-
-* Accuracy or task-specific performance
-* Number of parameters
-* Model size
-* Input resolution
-* Inference time
-* GPU memory usage
-* MATLAB compatibility
-* Deployment compatibility
-
-The final model will be selected after testing rather than choosing a network only because it is popular.
+Where useful, training progress and validation performance will be saved as part of the project results.
 
 ---
 
-## 9. MATLAB Development
+## 9. Evaluation
 
-MATLAB will initially be used for model development and evaluation.
+The AI model will be evaluated using the test dataset after training has been completed.
 
-The Deep Learning Toolbox will provide the main environment for:
-
-* Loading the dataset
-* Preparing training data
-* Defining the network
-* Training the model
-* Evaluating predictions
-* Inspecting errors
-* Measuring inference time
-
-The first objective is to establish a working reference model.
-
-At this point, optimization for Holoscan is not the main concern.
-
-The model needs to demonstrate that it can perform the selected task before deployment work begins.
-
----
-
-## 10. Baseline Model
-
-A simple baseline model will be trained first.
-
-The baseline is important because it gives us something against which later improvements can be measured.
-
-For example:
-
-```text
-Baseline Model
-      ↓
-Measure Accuracy
-      ↓
-Measure Inference Time
-      ↓
-Identify Problems
-      ↓
-Improve Model
-      ↓
-Compare Again
-```
-
-The baseline should be kept reasonably simple.
-
-There is little benefit in immediately building a complicated network if the dataset, labels, preprocessing, or task definition have not yet been verified.
-
----
-
-## 11. Model Evaluation
-
-The evaluation metrics will depend on the selected AI task.
-
-### Classification
-
-Possible metrics include:
+For the initial classification task, the main evaluation measures will include:
 
 * Accuracy
 * Precision
@@ -327,350 +200,264 @@ Possible metrics include:
 * F1-score
 * Confusion matrix
 
-Accuracy alone may not be sufficient if the classes are imbalanced.
+The appropriate metrics may change depending on the number of classes and their distribution.
 
-### Detection
+Accuracy alone will not be treated as sufficient if the dataset is significantly imbalanced.
 
-Possible metrics include:
+The confusion matrix will also be useful for identifying which classes are being confused by the model.
 
-* Precision
-* Recall
-* Intersection over Union
-* Mean Average Precision, where appropriate
-
-### Segmentation
-
-Possible metrics include:
-
-* Dice coefficient
-* Intersection over Union
-* Precision
-* Recall
-
-The final report will use metrics that actually match the selected task.
-
-The project will not present a single accuracy value as proof that the system is medically reliable.
-
-The AI model is being evaluated as an engineering component of the demonstration.
+The purpose of this stage is to establish whether the model is performing the intended classification task before it is integrated into the real-time pipeline.
 
 ---
 
-## 12. Error Analysis
+## 10. Enhanced Image as AI Input
 
-Model performance should also be inspected rather than relying only on a final metric.
+The intended pipeline places image enhancement before AI inference.
 
-Examples of useful analysis include:
+The complete processing relationship is therefore:
 
-* Correct predictions
-* Incorrect predictions
-* False positives
-* False negatives
-* Difficult image regions
-* Poor-quality inputs
-* Images affected by preprocessing
+**Raw RF Data → Image Reconstruction → Image Enhancement → AI Preprocessing → MobileNetV2**
 
-This can help determine whether the problem is related to the model itself or to the input image.
+This creates an important dependency between the image-processing and AI stages.
 
-Error analysis is also useful when deciding whether the image-enhancement stage is helping or hurting the AI system.
+The enhanced image must be converted into the representation expected by the neural network.
 
----
+The AI preprocessing stage may therefore include operations such as resizing and normalization.
 
-## 13. Enhancement and AI Input
+The same preprocessing must be applied during both training and deployment.
 
-The AI model should eventually receive the output of the image-enhancement stage.
+The effect of enhancement on classification performance will also be investigated.
 
-The intended relationship is:
+A useful experiment will be to compare the AI model using:
 
-```text
-Raw RF Data
-      ↓
-Image Reconstruction
-      ↓
-Image Enhancement
-      ↓
-AI Preprocessing
-      ↓
-AI Model
-      ↓
-AI Result
-```
-
-The preprocessing immediately before inference must be clearly defined.
-
-This may include resizing, normalization, conversion to the required number of channels, or other operations required by the selected network.
-
-The processing should be deterministic so that the same input produces the same expected preprocessing behavior during testing and deployment.
-
----
-
-## 14. Testing Enhanced Versus Unenhanced Input
-
-One useful experiment will be to compare AI performance using:
-
-```text
-Reconstructed Image → AI
-```
+**Reconstructed Image → AI**
 
 against:
 
-```text
-Reconstructed Image → Enhancement → AI
-```
+**Reconstructed Image → Enhancement → AI**
 
-This will show whether the enhancement stage actually benefits the AI task.
-
-The comparison should use the same test data and evaluation procedure.
-
-Possible outcomes are:
-
-* Enhancement improves model performance
-* Enhancement has little effect
-* Enhancement reduces model performance
-
-Any of these results is useful because it tells us something about the relationship between the image-processing and AI stages.
-
-The final pipeline should use the configuration that provides the best overall engineering trade-off rather than assuming that enhancement must always improve AI accuracy.
+This will allow us to determine whether the enhancement stage actually helps the downstream AI task.
 
 ---
 
-## 15. Inference Performance
+## 11. AI Inference
 
-Once the model is working correctly, inference time will be measured.
+Once the model has been trained, the next step will be to measure inference performance separately from training.
 
-The measurement should be performed separately from training.
+Training performance is not the main concern for the final application.
 
-Important values include:
+The important measurement is how long the trained model takes to process an individual image during deployment.
 
-* Model inference time
-* Preprocessing time
-* Postprocessing time
-* GPU memory usage
-* CPU-to-GPU transfer time where relevant
+The inference stage will therefore be tested using representative images and measured on the available NVIDIA GPU.
 
-The model should be tested over multiple frames rather than measuring only one inference.
+The following information will be recorded:
 
-Warm-up iterations may be excluded from the final measurement because initial GPU setup can take longer than steady-state inference.
+* Model input size
+* Model size
+* GPU memory usage where practical
+* Inference time
+* Inference throughput
+* Predicted class
+* Prediction confidence
 
----
-
-## 16. GPU Inference
-
-The final system will use the NVIDIA GPU for AI inference where appropriate.
-
-The RTX 3050 available in the validated development environment provides the target GPU for initial testing.
-
-The exact deployment path will depend on the selected network and the tools supported by the final implementation.
-
-Possible approaches may include MATLAB GPU execution, generated deployment code, or another NVIDIA-compatible inference path.
-
-The important requirement is that the final AI operator must be capable of receiving frames from the upstream pipeline and returning results without becoming an unnecessary bottleneck.
+The measurements will later be compared with the timing of the reconstruction and enhancement stages.
 
 ---
 
-## 17. AI Model Optimization
+## 12. GPU Execution
 
-If the baseline model is too slow for the intended pipeline, optimization will be considered.
+The final system is intended to execute computationally intensive processing on NVIDIA GPU hardware.
+
+The AI model will therefore be evaluated using GPU-based inference.
+
+The exact deployment mechanism will be selected after the MATLAB model has been trained and tested.
+
+The important requirement is that the AI inference implementation can operate efficiently with the rest of the GPU-based pipeline.
+
+Unnecessary CPU-GPU transfers should be avoided where possible because moving data between memory spaces can introduce additional latency.
+
+This becomes especially important once the model is placed inside the Holoscan streaming pipeline.
+
+---
+
+## 13. AI Model Optimization
+
+If the initial MobileNetV2 implementation is too slow or consumes more resources than practical for the target application, optimization will be investigated.
 
 Possible approaches include:
 
-* Reducing input resolution
+* Reducing the input resolution
+* Freezing additional layers
+* Simplifying the model
 * Selecting a smaller network
-* Reducing unnecessary layers
-* Using an appropriate numeric precision
-* GPU execution
-* Model-specific deployment optimization
+* Using supported inference optimizations
+* Reducing unnecessary data transfers
 
-Optimization will only be performed after the baseline model has been measured.
+The objective will not be to optimize the model before establishing a baseline.
 
-The project should report the actual effect of any optimization.
+The sequence will be:
 
-For example:
+**Working Model → Measure Performance → Identify Problem → Optimize → Measure Again**
 
-```text
-Baseline:
-Accuracy = measured value
-Inference = measured value
-
-Optimized:
-Accuracy = measured value
-Inference = measured value
-```
-
-This makes the trade-off visible instead of simply claiming that the optimized model is better.
+This provides a clear basis for deciding whether an optimization actually improves the system.
 
 ---
 
-## 18. AI Output Interface
-
-The AI stage must provide an output that can be consumed by the visualization stage.
-
-For classification:
-
-```text
-Class
-Confidence
-```
-
-For detection:
-
-```text
-Bounding Box
-Class
-Confidence
-```
-
-For segmentation:
-
-```text
-Segmentation Mask
-Class / Label
-Confidence where applicable
-```
-
-The output should remain associated with the input frame that produced it.
-
-This is particularly important once the pipeline becomes asynchronous or contains multiple frames in flight.
-
----
-
-## 19. Holoscan Integration
+## 14. Integration With Holoscan
 
 After the AI model has been validated independently, it will be integrated into the Holoscan application.
 
-The intended flow is:
+The intended dataflow will be:
 
-```text
-Data Source
-      ↓
-Reconstruction Operator
-      ↓
-Enhancement Operator
-      ↓
-AI Inference Operator
-      ↓
-Visualization
-```
+**Data Source → Reconstruction → Enhancement → AI Inference → Visualization**
 
-The AI operator should have one clear responsibility: receive a valid image, perform inference, and return the corresponding result.
+The AI operator will receive the processed image from the enhancement stage.
 
-It should not contain unrelated reconstruction or visualization logic.
+It will perform the required preprocessing and inference and return the classification result.
 
-This separation will make it easier to test and replace the model later.
+The visualization stage can then display the processed ultrasound image together with the predicted class and confidence.
 
----
+The AI component should not depend on the source of the ultrasound data.
 
-## 20. Visualization of AI Results
+The input may eventually come from:
 
-The AI output should be visible in the final demonstration.
+* Simulated data
+* Prerecorded data
+* Real acquisition hardware
 
-For classification, the predicted class and confidence can be displayed alongside the ultrasound image.
-
-For detection, bounding boxes can be drawn over the detected regions.
-
-For segmentation, the predicted mask can be displayed as an overlay.
-
-The final visualization should make it obvious which AI result belongs to which image frame.
+The AI operator should receive the same expected image representation regardless of the upstream source.
 
 ---
 
-## 21. Medical and Research Limitations
+## 15. AI and Real-Time Performance
 
-The AI output will be treated as a research and engineering demonstration.
+The AI model will be evaluated as part of the complete pipeline rather than only as an independent benchmark.
 
-It will not be presented as a medical diagnosis.
+For example, a model may have excellent classification accuracy but still be unsuitable if its inference time creates an unacceptable bottleneck.
 
-The model will not be claimed to be clinically validated unless appropriate clinical validation has actually been performed.
+The final performance evaluation will therefore consider:
 
-The selected dataset may also differ substantially from data produced by the final raw-RF reconstruction pipeline.
+**Reconstruction Time + Enhancement Time + AI Inference Time + Other Pipeline Overhead**
 
-These limitations should be stated clearly in the project documentation and demonstration.
+The actual end-to-end latency will be measured once the complete Holoscan pipeline is operational.
 
-The purpose of the AI stage is to demonstrate the technical integration of machine learning into a real-time ultrasound processing system.
-
----
-
-## 22. Development Procedure
-
-The AI work will follow this sequence:
-
-```text
-Define AI Task
-        ↓
-Select Dataset
-        ↓
-Inspect Labels
-        ↓
-Prepare Dataset
-        ↓
-Create Train / Validation / Test Sets
-        ↓
-Train Baseline Model
-        ↓
-Evaluate Model
-        ↓
-Perform Error Analysis
-        ↓
-Compare Enhanced / Unenhanced Input
-        ↓
-Measure Inference Time
-        ↓
-Optimize Model if Necessary
-        ↓
-Validate GPU Inference
-        ↓
-Integrate With Holoscan
-```
-
-The order is intentional.
-
-There is no point optimizing inference speed before knowing whether the model performs the intended task correctly.
+The AI stage will be considered successful only if it provides useful classification performance without preventing the overall application from meeting its target processing rate.
 
 ---
 
-## 23. Acceptance Criteria
+## 16. Baseline and Future Models
 
-The AI stage will be considered ready for integration when the following have been established:
+MobileNetV2 will be treated as the initial baseline rather than an irreversible final choice.
 
-* A clearly defined AI task exists.
-* A suitable dataset has been selected.
-* Training, validation, and testing procedures are documented.
-* A baseline model produces meaningful results.
-* The selected evaluation metrics have been measured.
-* Model errors have been inspected.
-* The required input preprocessing is defined.
-* Inference time has been measured.
-* GPU execution has been tested where applicable.
-* The AI output has a defined interface.
-* The model can accept the image format produced by the upstream pipeline.
-* The result can be passed to the visualization stage.
-* The model's limitations are documented.
+Once the baseline has been implemented and measured, another lightweight model can be evaluated if there is a clear reason to do so.
 
-Only after these conditions are satisfied should the AI component be treated as ready for full Holoscan integration.
+Any alternative model should be compared using the same general evaluation procedure.
+
+The comparison should consider both:
+
+**AI Performance**
+
+and
+
+**System Performance**
+
+For example:
+
+| Metric         | MobileNetV2 | Alternative |
+| -------------- | ----------: | ----------: |
+| Test Accuracy  |  To measure |  To measure |
+| F1-score       |  To measure |  To measure |
+| Model Size     |  To measure |  To measure |
+| Inference Time |  To measure |  To measure |
+| GPU Memory     |  To measure |  To measure |
+| Pipeline FPS   |  To measure |  To measure |
+
+This prevents the model-selection process from being based only on classification accuracy.
 
 ---
 
-## 24. Expected Result
+## 17. Medical Use Limitation
 
-The completed AI stage should take an enhanced ultrasound image and produce a defined interpretation result at a measurable processing speed.
+The AI output in this project is intended only as an engineering demonstration.
 
-The complete relationship will be:
+The classification result must not be presented as a clinical diagnosis or as a replacement for medical professionals.
 
-```text
-Raw Ultrasound Data
-        ↓
-Image Reconstruction
-        ↓
-Image Enhancement
-        ↓
-AI Preprocessing
-        ↓
-AI Inference
-        ↓
-Prediction / Detection / Segmentation
-        ↓
-Visualization
-```
+A model trained on a public dataset is not sufficient to establish clinical effectiveness.
 
-The final model will be chosen based on actual measurements rather than on model complexity alone.
+Clinical deployment would require substantially more validation, appropriate patient data, expert review, regulatory assessment, and other requirements that are outside the scope of this project.
 
-The important result is that AI becomes a real processing stage in the imaging pipeline, with a known input, known output, measured performance, and a clear path toward GPU-accelerated Holoscan deployment.
+The AI stage is being developed to demonstrate how machine-learning inference can be incorporated into a real-time medical-imaging processing system.
+
+---
+
+## 18. Development Sequence
+
+The AI implementation will follow this progression:
+
+**Define Classification Task**
+
+↓
+
+**Select and Inspect Dataset**
+
+↓
+
+**Prepare Training / Validation / Test Data**
+
+↓
+
+**Set Up MobileNetV2 Transfer Learning**
+
+↓
+
+**Train Baseline Model**
+
+↓
+
+**Evaluate Test Performance**
+
+↓
+
+**Measure GPU Inference**
+
+↓
+
+**Compare Enhanced vs. Non-Enhanced Input**
+
+↓
+
+**Optimize if Required**
+
+↓
+
+**Integrate With Holoscan**
+
+↓
+
+**Measure End-to-End Performance**
+
+This keeps the AI development separate from the final streaming integration until the model has been shown to work independently.
+
+---
+
+## 19. Initial AI Baseline
+
+The initial AI baseline for the project is therefore:
+
+| Item                    | Initial Choice                         |
+| ----------------------- | -------------------------------------- |
+| AI task                 | Ultrasound image classification        |
+| Baseline network        | MobileNetV2                            |
+| Training approach       | Transfer learning                      |
+| Development environment | MATLAB                                 |
+| Toolbox                 | Deep Learning Toolbox                  |
+| Input                   | Enhanced ultrasound image              |
+| Output                  | Class + confidence                     |
+| Inference target        | NVIDIA GPU                             |
+| Final integration       | NVIDIA Holoscan                        |
+| Dataset                 | To be confirmed                        |
+| Final model             | To be determined from measured results |
+
+The dataset and final model configuration will only be considered fixed after the relevant experiments have been completed.
+
+The purpose of this baseline is to give the project a concrete starting point without making claims about performance that have not yet been measured.
