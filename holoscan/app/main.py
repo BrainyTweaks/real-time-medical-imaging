@@ -4,13 +4,16 @@ from holoscan.core import Application, Operator, OperatorSpec
 class SourceOperator(Operator):
     def __init__(self, fragment, *args, **kwargs):
         super().__init__(fragment, *args, **kwargs)
+        self.frame_id = 0
 
     def setup(self, spec: OperatorSpec):
         spec.output("out")
 
     def compute(self, op_input, op_output, context):
+        self.frame_id += 1
+
         frame = {
-            "frame_id": 1,
+            "frame_id": self.frame_id,
             "source": "project259",
             "payload": "synthetic-frame",
         }
