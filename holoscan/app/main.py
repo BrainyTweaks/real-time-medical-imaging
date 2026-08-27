@@ -9,8 +9,14 @@ class SourceOperator(Operator):
         spec.output("out")
 
     def compute(self, op_input, op_output, context):
-        print("Project 259: Holoscan source operator executed.")
-        op_output.emit("frame", "out")
+        frame = {
+            "frame_id": 1,
+            "source": "project259",
+            "payload": "synthetic-frame",
+        }
+
+        print(f"Project 259: source produced frame {frame['frame_id']}.")
+        op_output.emit(frame, "out")
 
 
 class SinkOperator(Operator):
@@ -21,8 +27,12 @@ class SinkOperator(Operator):
         spec.input("in")
 
     def compute(self, op_input, op_output, context):
-        message = op_input.receive("in")
-        print(f"Project 259: Holoscan sink received: {message}")
+        frame = op_input.receive("in")
+
+        print(
+            f"Project 259: sink received frame "
+            f"{frame['frame_id']} from {frame['source']}."
+        )
 
 
 class Project259Application(Application):
